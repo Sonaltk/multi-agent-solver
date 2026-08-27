@@ -6,3 +6,4 @@ langchain-anthropic
 langchain-groq
 PyGithub
 python-dotenv
+ruff==0.16.4
