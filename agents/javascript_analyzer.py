@@ -3,6 +3,7 @@ import subprocess
 from pathlib import Path
 
 from models.review import Finding
+from tools.finding_classifier import classify_finding
 
 
 def has_eslint_config(workspace: Path) -> bool:
@@ -123,10 +124,21 @@ def run_eslint(
                 if line not in changed_lines:
                     continue
 
-                severity = (
+                rule_id = violation.get("ruleId")
+
+                # ESLint's own error(2)/warn(1) level is used only as a
+                # fallback for rules we don't explicitly classify.
+                eslint_default_severity = (
                     "HIGH"
                     if violation["severity"] == 2
                     else "LOW"
+                )
+
+                severity, category = classify_finding(
+                    rule_id,
+                    "eslint",
+                    fallback_severity=eslint_default_severity,
+                    fallback_category="style",
                 )
 
                 suggestion = "Review and correct this issue."
@@ -142,17 +154,14 @@ def run_eslint(
                 findings.append(
                     Finding(
                         severity=severity,
-                        category="style",
+                        category=category,
                         file_path=file_path,
                         line_start=line,
                         line_end=violation.get(
                             "endLine",
                             line,
                         ),
-                        title=violation.get(
-                            "ruleId",
-                            "ESLint violation",
-                        ),
+                        title=rule_id or "ESLint violation",
                         description=violation["message"],
                         suggestion=suggestion,
                         confidence=0.95,

@@ -5,6 +5,7 @@ from pathlib import Path
 
 from models.review import Finding
 from tools.language_detector import detect_languages
+from tools.finding_classifier import classify_finding
 from agents.javascript_analyzer import run_eslint
 
 def extract_changed_lines(patch: str) -> list[int]:
@@ -156,14 +157,19 @@ def run_ruff(
             if violation_line not in changed_lines:
                 continue
 
+        severity, category = classify_finding(
+            violation["code"],
+            "ruff",
+        )
+
         findings.append(
             Finding(
-                severity="LOW",
-                category="style",
+                severity=severity,
+                category=category,
                 file_path=relative_path,
                 line_start=violation["location"]["row"],
                 line_end=violation["end_location"]["row"],
-                title=violation["message"],
+                title=f"{violation['code']} {violation['message']}",
                 description=(
                     f"Ruff detected {violation['code']}: "
                     f"{violation['message']}"
