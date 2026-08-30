@@ -130,9 +130,60 @@ ESLINT_RULE_OVERRIDES: dict[str, tuple[Severity, Category]] = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Bandit (Python security scanner) — exact rule code overrides
+# ---------------------------------------------------------------------------
+# Bandit assigns its own severity (LOW/MEDIUM/HIGH), but it tends to
+# under-rate genuinely dangerous patterns (e.g. a hardcoded password is
+# only "LOW" by Bandit's own scale). These overrides escalate the rules
+# that matter most; anything not listed falls back to Bandit's own
+# severity rating, translated 1:1 (Bandit doesn't have a CRITICAL tier).
+
+BANDIT_RULE_OVERRIDES: dict[str, tuple[Severity, Category]] = {
+    # Hardcoded secrets
+    "B105": ("HIGH", "security"),   # hardcoded password (string)
+    "B106": ("HIGH", "security"),   # hardcoded password (function arg)
+    "B107": ("HIGH", "security"),   # hardcoded password (default arg)
+
+    # Dangerous eval/exec
+    "B102": ("HIGH", "security"),   # exec used
+    "B307": ("HIGH", "security"),   # eval used
+
+    # Unsafe deserialization
+    "B301": ("HIGH", "security"),   # pickle.loads / pickle.load
+    "B302": ("HIGH", "security"),   # marshal
+    "B506": ("HIGH", "security"),   # yaml.load without SafeLoader
+
+    # Command / SQL injection
+    "B602": ("HIGH", "security"),       # subprocess with shell=True
+    "B603": ("MEDIUM", "security"),     # subprocess without shell (partial path risk)
+    "B605": ("HIGH", "security"),       # os.system
+    "B609": ("HIGH", "security"),       # wildcard injection
+    "B608": ("CRITICAL", "security"),   # SQL injection via string building
+
+    # Weak crypto
+    "B324": ("MEDIUM", "security"),     # weak hash (md5/sha1)
+
+    # Framework misconfiguration
+    "B201": ("HIGH", "security"),       # Flask app.run(debug=True)
+    "B701": ("HIGH", "security"),       # Jinja2 autoescape disabled
+
+    # Low-value "you imported a risky module" noise — downgrade so these
+    # don't drown out findings about how the module is actually *used*.
+    "B403": ("LOW", "style"),   # import pickle
+    "B404": ("LOW", "style"),   # import subprocess
+    "B405": ("LOW", "style"),   # import xml.etree
+    "B410": ("LOW", "style"),   # import lxml
+    "B411": ("LOW", "style"),   # import xmlrpclib
+
+    "B108": ("LOW", "style"),          # hardcoded /tmp path
+    "B104": ("MEDIUM", "reliability"), # binding to 0.0.0.0
+}
+
+
 def classify_finding(
     rule_code: str | None,
-    source: Literal["ruff", "eslint"],
+    source: Literal["ruff", "eslint", "bandit"],
     fallback_severity: Severity = DEFAULT_SEVERITY,
     fallback_category: Category = DEFAULT_CATEGORY,
 ) -> tuple[Severity, Category]:
@@ -168,6 +219,15 @@ def classify_finding(
         if rule_code in ESLINT_RULE_OVERRIDES:
             return ESLINT_RULE_OVERRIDES[rule_code]
 
+        return fallback_severity, fallback_category
+
+    if source == "bandit":
+        if rule_code in BANDIT_RULE_OVERRIDES:
+            return BANDIT_RULE_OVERRIDES[rule_code]
+
+        # Fall back to whatever Bandit's own severity rating was
+        # (passed in by the caller), category is always security
+        # unless explicitly downgraded above.
         return fallback_severity, fallback_category
 
     return fallback_severity, fallback_category
