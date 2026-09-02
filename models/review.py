@@ -40,7 +40,19 @@ class ReviewState(TypedDict):
     style_findings: list[Finding]
     architecture_findings: list[Finding]
 
+    # Findings the AI reviewer identified that weren't caught by any
+    # static tool (logical bugs, missing edge cases, test coverage gaps).
+    ai_findings: list[Finding]
+
+    # Titles of static/security findings the AI reviewer believes are
+    # false positives, with its reasoning. Not deleted from the original
+    # lists here — the Finding Merger (later) decides what to do with them.
+    likely_false_positives: list[dict[str, str]]
+
+    ai_verdict: str  # "approve" | "request_changes"
+
     merged_findings: list[Finding]
+    formatted_review: str
 
     review_summary: str
 
